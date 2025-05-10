@@ -1,0 +1,63 @@
+# Python кэш и байт-код
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Виртуальные окружения
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# Настройки и личные данные
+app_settings.json
+api_keys.json
+*.log
+*.db
+*.sqlite3
+
+# Директории моделей (больше 100 МБ - загружать через Git LFS)
+# Раскомментируйте, если НЕ хотите хранить модели в репозитории
+# models/
+
+# Временные файлы
+.tmp/
+tmp/
+temp/
+
+# Файлы IDE и редакторов
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.directory
+
+# Файлы сборки и дистрибутивы
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Примечание: модель перевода Helsinki-NLP/opus-mt-en-ru занимает много места
+# и может быть исключена из репозитория, но это затруднит использование
+# Если хотите исключить модели, раскомментируйте строку:
+# models/models--Helsinki-NLP--opus-mt-en-ru/ 
