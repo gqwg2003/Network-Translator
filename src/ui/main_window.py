@@ -6,6 +6,7 @@ from src.translator.translator import Translator
 from src.ui.panels.translator_panel import TranslatorPanel
 from src.ui.panels.server_panel import ServerPanel
 from src.ui.panels.batch_translator_panel import BatchTranslatorPanel
+from src.ui.panels.model_manager_panel import ModelManagerPanel
 from src.ui.widgets.status_bar import StatusBar
 from src.ui.utils.theme_manager import ThemeManager
 from src.utils.settings import load_settings, save_settings, get_setting, set_setting
@@ -72,10 +73,16 @@ class MainWindow:
             self.notebook,
             on_status_change=self._update_status
         )
+        self.model_manager_panel = ModelManagerPanel(
+            self.notebook,
+            translator=self.translator,
+            on_status_change=self._update_status
+        )
         
         # Add panels to notebook
         self.notebook.add(self.translator_panel, text="Text Translator")
         self.notebook.add(self.batch_translator_panel, text="Batch Translator")
+        self.notebook.add(self.model_manager_panel, text="Models")
         self.notebook.add(self.server_panel, text="API Server")
         
         # Create status bar
@@ -100,10 +107,11 @@ class MainWindow:
         
         # Initialize status bar
         model_info = self.translator.get_model_info()
-        model_path = model_info.get("model_path", "Unknown")
+        display_name = model_info.get("display_name", model_info.get("model_id", "Unknown"))
         model_loaded = model_info.get("model_loaded", False)
+        quality = model_info.get("quality", 0)
         
-        model_status = f"Model: {model_path.split('/')[-1]}"
+        model_status = f"Model: {display_name} ({quality}%)"
         status_color = "green" if model_loaded else "red"
         
         self.status_bar.set_status("model", model_status, status_color)
@@ -118,6 +126,11 @@ class MainWindow:
         file_menu = Menu(menubar, tearoff=0)
         file_menu.add_command(label="Exit", command=self._on_close)
         menubar.add_cascade(label="File", menu=file_menu)
+        
+        # Models menu
+        models_menu = Menu(menubar, tearoff=0)
+        models_menu.add_command(label="Manage Models", command=self._show_models_tab)
+        menubar.add_cascade(label="Models", menu=models_menu)
         
         # View menu
         view_menu = Menu(menubar, tearoff=0)
@@ -143,6 +156,14 @@ class MainWindow:
         """Cycle through themes and save the selected one"""
         theme_name = self.theme_manager.toggle_theme()
         set_setting("theme", theme_name)
+    
+    def _show_models_tab(self):
+        """Switch to the models tab"""
+        # Find the index of the models tab
+        for i in range(self.notebook.index("end")):
+            if "Models" in self.notebook.tab(i, "text"):
+                self.notebook.select(i)
+                break
     
     def _load_panel_data(self):
         """Load saved data into panels"""
@@ -247,69 +268,75 @@ class MainWindow:
         
         ttk.Label(
             about_window, 
-            text="Model: Helsinki-NLP/opus-mt-en-ru",
+            text="Features:",
             background=theme["bg"],
-            foreground=theme["fg"]
-        ).pack(pady=5)
+            foreground=theme["fg"],
+            font=theme["bold_font"]
+        ).pack(pady=(10, 5), anchor=tk.W, padx=30)
+        
+        features_text = "• Multiple translation models\n• Batch translation\n• Model selection\n• Model downloading\n• API server"
+        ttk.Label(
+            about_window, 
+            text=features_text,
+            background=theme["bg"],
+            foreground=theme["fg"],
+            justify=tk.LEFT
+        ).pack(anchor=tk.W, padx=45)
         
         ttk.Button(
             about_window, 
-            text="OK", 
+            text="Close", 
             command=about_window.destroy
         ).pack(pady=20)
-        
-        # Center the window relative to the main window
-        about_window.update_idletasks()
-        width = about_window.winfo_width()
-        height = about_window.winfo_height()
-        
-        x = self.root.winfo_x() + (self.root.winfo_width() - width) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - height) // 2
-        
-        about_window.geometry(f"{width}x{height}+{x}+{y}")
     
     def _update_status(self, message: str, status_type: str = "info"):
         """
         Update the status bar with a message
         
         Args:
-            message: The status message
-            status_type: Message type (info, success, error)
+            message: Status message
+            status_type: Type of status message (info, success, error, wait)
         """
-        # Map status type to color
-        theme = self.theme_manager.get_theme()
-        color_map = {
-            "info": theme["info"],
-            "success": theme["success"],
-            "error": theme["error"],
-            "warning": theme["warning"]
-        }
-        
-        color = color_map.get(status_type, theme["fg"])
-        self.status_bar.set_status("status", message, color)
-        
-        # Log to console as well
-        print(f"[{status_type.upper()}] {message}")
+        if status_type == "error":
+            self.status_bar.set_status("status", message, "red")
+        elif status_type == "success":
+            self.status_bar.set_status("status", message, "green")
+        elif status_type == "wait":
+            self.status_bar.set_status("status", message, "orange")
+        else:  # info
+            self.status_bar.set_status("status", message)
+            
+        # Update model info if it might have changed
+        if "model" in message.lower():
+            model_info = self.translator.get_model_info()
+            display_name = model_info.get("display_name", model_info.get("model_id", "Unknown"))
+            model_loaded = model_info.get("model_loaded", False)
+            quality = model_info.get("quality", 0)
+            
+            model_status = f"Model: {display_name} ({quality}%)"
+            status_color = "green" if model_loaded else "red"
+            
+            self.status_bar.set_status("model", model_status, status_color)
     
     def _on_close(self):
         """Handle window close event"""
-        # Сохраняем настройки перед выходом
+        # Сохранение данных перед закрытием
         self._save_panel_data()
+        save_settings(load_settings())  # Ensure all settings are saved
         
-        # Завершаем работу приложения
-        self.root.quit()
+        # Закрытие окна
         self.root.destroy()
     
     def run(self):
-        """Run the main window loop"""
-        # Center the window on screen
+        """Run the application"""
+        # Center the window on the screen
         self._center_window()
         
-        # Start the application main loop
+        # Start the main loop
         self.root.mainloop()
     
     def _center_window(self):
-        """Center the window on the screen"""
+        """Center the main window on the screen"""
         self.root.update_idletasks()
         
         width = self.root.winfo_width()

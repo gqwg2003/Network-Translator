@@ -3,12 +3,13 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from typing import List, Optional
 
 class TranslationModel:
-    def __init__(self, model_path: str = None):
+    def __init__(self, model_path: str = None, model_id: str = None):
         """
         Initialize the translation model
         
         Args:
             model_path: Path to the model directory
+            model_id: Model identifier (for metadata)
         """
         if model_path is None:
             # Use default model path
@@ -16,6 +17,7 @@ class TranslationModel:
                                     "models", "models--Helsinki-NLP--opus-mt-en-ru")
         
         self.model_path = model_path
+        self.model_id = model_id or "Helsinki-NLP/opus-mt-en-ru"
         self.model = None
         self.tokenizer = None
         self._load_model()
@@ -29,6 +31,26 @@ class TranslationModel:
         except Exception as e:
             print(f"Error loading model: {e}")
             raise
+    
+    def change_model(self, model_path: str, model_id: str = None):
+        """
+        Change the current model to a different one
+        
+        Args:
+            model_path: Path to the new model directory
+            model_id: Model identifier (for metadata)
+        """
+        # Unload current model to free memory
+        self.model = None
+        self.tokenizer = None
+        
+        # Update model path and ID
+        self.model_path = model_path
+        if model_id:
+            self.model_id = model_id
+            
+        # Load the new model
+        self._load_model()
     
     def translate(self, text: str) -> str:
         """
