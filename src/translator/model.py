@@ -1,4 +1,5 @@
 import os
+import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from typing import List, Optional
 
@@ -20,14 +21,17 @@ class TranslationModel:
         self.model_id = model_id or "Helsinki-NLP/opus-mt-en-ru"
         self.model = None
         self.tokenizer = None
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._load_model()
     
     def _load_model(self):
         """Load the model and tokenizer from the specified path"""
         try:
             self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_path)
+            self.model.to(self.device)
+            self.model.eval()  # Set model to evaluation mode
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
-            print(f"Model loaded successfully from {self.model_path}")
+            print(f"Model loaded successfully from {self.model_path} on device: {self.device}")
         except Exception as e:
             print(f"Error loading model: {e}")
             raise
@@ -65,14 +69,21 @@ class TranslationModel:
         if not text:
             return ""
         
-        # Tokenize the input text
-        inputs = self.tokenizer(text, return_tensors="pt", padding=True)
-        
-        # Generate translation
-        outputs = self.model.generate(**inputs)
-        
-        # Decode the translated text
-        translation = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        with torch.inference_mode():
+            # Tokenize the input text
+            inputs = self.tokenizer(text, return_tensors="pt", padding=True)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            
+            # Generate translation
+            outputs = self.model.generate(
+                **inputs,
+                max_length=512,
+                num_beams=4,
+                early_stopping=True
+            )
+            
+            # Decode the translated text
+            translation = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
         return translation
     
@@ -89,14 +100,29 @@ class TranslationModel:
         if not texts:
             return []
         
-        # Tokenize the input texts
-        inputs = self.tokenizer(texts, return_tensors="pt", padding=True)
+        with torch.inference_mode():
+            # Tokenize the input texts
+            inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            
+            # Process in batches of 8 for better memory management
+            batch_size = 8
+            translations = []
+            
+            for i in range(0, len(texts), batch_size):
+                batch_inputs = {k: v[i:i+batch_size] for k, v in inputs.items()}
+                
+                # Generate translations
+                outputs = self.model.generate(
+                    **batch_inputs,
+                    max_length=512,
+                    num_beams=4,
+                    early_stopping=True
+                )
+                
+                # Decode the translated texts
+                batch_translations = [self.tokenizer.decode(output, skip_special_tokens=True) 
+                                     for output in outputs]
+                translations.extend(batch_translations)
         
-        # Generate translations
-        outputs = self.model.generate(**inputs)
-        
-        # Decode the translated texts
-        translations = [self.tokenizer.decode(output, skip_special_tokens=True) 
-                       for output in outputs]
-        
-        return translations 
+        return translations[:len(texts)] 

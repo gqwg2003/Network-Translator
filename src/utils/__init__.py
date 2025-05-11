@@ -1,3 +1,3 @@
 """
-Utility functions for the translator application
+Utility modules for the Neural Network Translator
 """ 
