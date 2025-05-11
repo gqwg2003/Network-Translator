@@ -6,6 +6,13 @@ import os
 import hashlib
 import time
 from src.utils.text_formatter import TextFormatter
+from src.utils.logger import get_logger
+
+# Константы для кэширования
+CACHE_ENABLED_DEFAULT = True
+CACHE_LIMIT_DEFAULT = 5000
+CACHE_SAVE_INTERVAL = 20
+TEXT_HASH_THRESHOLD = 100
 
 class Translator:
     def __init__(self, model_path: Optional[str] = None, model_id: Optional[str] = None):
@@ -16,20 +23,26 @@ class Translator:
             model_path: Optional path to the translation model
             model_id: Optional model identifier
         """
+        # Инициализация логгера
+        self.logger = get_logger("nn_translator.translator")
+        self.logger.info("Initializing translator")
+        
         # Initialize model manager
         self.model_manager = ModelManager()
         
         # Get model path from manager if model_id is provided
         if model_id:
             model_path = self.model_manager.get_model_path(model_id)
+            self.logger.debug(f"Using model path from model_id: {model_id} -> {model_path}")
         
         # Initialize model
         self.model = TranslationModel(model_path, model_id)
         self.current_model_id = model_id or "Helsinki-NLP/opus-mt-en-ru"
+        self.logger.info(f"Translator initialized with model: {self.current_model_id}")
         
         # Initialize translation cache
-        self.cache_enabled = True
-        self.cache_limit = 5000  # Maximum number of cached translations
+        self.cache_enabled = CACHE_ENABLED_DEFAULT
+        self.cache_limit = CACHE_LIMIT_DEFAULT
         self.translation_cache = {}
         self._load_cache()
         
@@ -41,6 +54,7 @@ class Translator:
             "normalize_whitespace": True,
             "fix_common_issues": True
         }
+        self.logger.debug(f"Text formatting options: {self.formatting_options}")
     
     def _load_cache(self):
         """Load translation cache from disk if it exists"""
@@ -49,10 +63,12 @@ class Translator:
             try:
                 with open(cache_path, 'r', encoding='utf-8') as f:
                     self.translation_cache = json.load(f)
-                print(f"Loaded {len(self.translation_cache)} cached translations")
+                self.logger.info(f"Loaded {len(self.translation_cache)} cached translations")
             except Exception as e:
-                print(f"Error loading translation cache: {e}")
+                self.logger.error(f"Error loading translation cache: {e}")
                 self.translation_cache = {}
+        else:
+            self.logger.info("No translation cache found, starting with empty cache")
     
     def _save_cache(self):
         """Save translation cache to disk"""
@@ -66,6 +82,7 @@ class Translator:
             
             # If cache is too large, remove oldest entries
             if len(self.translation_cache) > self.cache_limit:
+                self.logger.info(f"Cache limit exceeded ({len(self.translation_cache)} > {self.cache_limit}), removing oldest entries")
                 # Convert to list of tuples for sorting
                 cache_items = list(self.translation_cache.items())
                 # Sort by timestamp (assuming each value has a 'timestamp' field)
@@ -74,11 +91,13 @@ class Translator:
                 items_to_remove = len(cache_items) - self.cache_limit
                 reduced_cache = dict(cache_items[items_to_remove:])
                 self.translation_cache = reduced_cache
+                self.logger.debug(f"Removed {items_to_remove} oldest entries from cache")
             
             with open(cache_path, 'w', encoding='utf-8') as f:
                 json.dump(self.translation_cache, f, ensure_ascii=False)
+                self.logger.debug(f"Saved {len(self.translation_cache)} cache entries to {cache_path}")
         except Exception as e:
-            print(f"Error saving translation cache: {e}")
+            self.logger.error(f"Error saving translation cache: {e}")
     
     def _get_cache_path(self):
         """Get the path to the cache file"""
@@ -89,7 +108,7 @@ class Translator:
     def _get_cache_key(self, text):
         """Generate a unique cache key for a text"""
         # Use a hash for longer texts to keep keys manageable
-        if len(text) > 100:
+        if len(text) > TEXT_HASH_THRESHOLD:
             return hashlib.md5(text.encode('utf-8')).hexdigest()
         # Use the text itself for shorter texts (faster lookup)
         return text
@@ -107,14 +126,23 @@ class Translator:
         """
         if not text:
             return ""
-            
+        
+        text_length = len(text)
+        self.logger.info(f"Translating text ({text_length} chars), formatting: {apply_formatting}")
+        self.logger.debug(f"Text sample: {text[:50]}...")
+        
+        start_time = time.time()
+        
         # Check cache first if enabled
+        cache_hit = False
         if self.cache_enabled:
             cache_key = self._get_cache_key(text)
             if cache_key in self.translation_cache:
                 cached = self.translation_cache[cache_key]
                 # Check if the cached translation is for the current model
                 if cached.get('model_id') == self.current_model_id:
+                    cache_hit = True
+                    self.logger.debug("Cache hit")
                     # If formatting is requested but the cached version isn't formatted,
                     # or if we have a formatted version but formatting is not requested,
                     # we need to handle it
@@ -149,10 +177,12 @@ class Translator:
                         return cached.get('translation', '')
         
         # Perform translation
+        self.logger.debug("Cache miss, performing translation" if self.cache_enabled else "Cache disabled, performing translation")
         translation_raw = self.model.translate(text)
         
         # Apply formatting if requested
         if apply_formatting:
+            self.logger.debug("Applying text formatting")
             translation = self.text_formatter.process_text(translation_raw, self.formatting_options)
         else:
             translation = translation_raw
@@ -169,10 +199,14 @@ class Translator:
                 'timestamp': time.time()
             }
             
-            # Periodically save cache to disk (every 20 translations)
-            if len(self.translation_cache) % 20 == 0:
+            # Periodically save cache to disk
+            if len(self.translation_cache) % CACHE_SAVE_INTERVAL == 0:
+                self.logger.debug(f"Saving cache (interval: {CACHE_SAVE_INTERVAL} translations)")
                 self._save_cache()
-                
+        
+        elapsed_time = time.time() - start_time
+        self.logger.info(f"Translation completed in {elapsed_time:.2f} seconds, result length: {len(translation)} chars")
+        
         return translation
     
     def translate_batch(self, texts: List[str], apply_formatting: bool = True) -> List[str]:
