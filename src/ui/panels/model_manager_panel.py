@@ -35,6 +35,30 @@ class ModelManagerPanel(ttk.Frame):
     
     def _create_widgets(self):
         """Create panel widgets"""
+        # Set style for labels and frames
+        style = ttk.Style()
+        style.configure("SectionTitle.TLabel", 
+                      font=("Segoe UI", 12, "bold"),
+                      foreground="#121C30")
+                      
+        style.configure("Card.TLabelframe", 
+                      borderwidth=1,
+                      relief="solid")
+                      
+        style.configure("Card.TLabelframe.Label", 
+                      font=("Segoe UI", 11, "bold"),
+                      foreground="#121C30")
+        
+        # Configure tab style
+        style.configure("TNotebook.Tab", 
+                      padding=(10, 5),
+                      font=("Segoe UI", 10))
+        
+        # Configure button styles
+        style.configure("Action.TButton", 
+                      padding=(8, 4),
+                      font=("Segoe UI", 9))
+        
         # Notebook for tabs
         self.notebook = ttk.Notebook(self)
         
@@ -42,14 +66,34 @@ class ModelManagerPanel(ttk.Frame):
         self.selection_frame = ttk.Frame(self.notebook)
         
         # Model list
-        models_frame = ttk.LabelFrame(self.selection_frame, text="Available Models")
+        models_frame = ttk.LabelFrame(
+            self.selection_frame, 
+            text="Available Models", 
+            padding=(15, 10),
+            style="Card.TLabelframe"
+        )
         
         # Create a frame with scrollbar for models
         self.models_scroll_frame = ScrollableFrame(models_frame)
         self.models_container = self.models_scroll_frame.scrollable_frame
         
         # Current model info
-        current_model_frame = ttk.LabelFrame(self.selection_frame, text="Current Model")
+        style.configure("Current.TLabelframe", 
+                       padding=(15, 12), 
+                       relief="solid", 
+                       borderwidth=1,
+                       background="#E3EFFF")
+                       
+        style.configure("Current.TLabelframe.Label", 
+                       font=("Segoe UI", 11, "bold"),
+                       foreground="#121C30",
+                       background="#E3EFFF")
+        
+        current_model_frame = ttk.LabelFrame(
+            self.selection_frame, 
+            text="Current Model", 
+            style="Current.TLabelframe"
+        )
         
         self.current_model_name = ttk.Label(current_model_frame, text="Model: Loading...")
         self.current_model_quality = ttk.Label(current_model_frame, text="Quality: N/A")
@@ -59,79 +103,218 @@ class ModelManagerPanel(ttk.Frame):
         self.download_frame = ttk.Frame(self.notebook)
         
         # Search frame
-        search_frame = ttk.Frame(self.download_frame)
-        ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT, padx=5)
+        search_frame = ttk.Frame(self.download_frame, padding=(10, 15, 10, 10))
+        ttk.Label(search_frame, text="Search:", font=("Segoe UI", 10, "bold")).pack(side=tk.LEFT, padx=5)
         
         self.search_var = tk.StringVar()
-        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=40)
-        self.search_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=40, font=("Segoe UI", 10))
+        self.search_entry.pack(side=tk.LEFT, padx=10, fill=tk.X, expand=True)
         
-        self.search_button = ttk.Button(search_frame, text="Search", command=self._search_models)
+        self.search_button = ttk.Button(
+            search_frame, 
+            text="Search", 
+            command=self._search_models,
+            style="Accent.TButton"
+        )
         self.search_button.pack(side=tk.LEFT, padx=5)
         
         # Results frame
-        results_frame = ttk.LabelFrame(self.download_frame, text="Search Results")
+        results_frame = ttk.LabelFrame(
+            self.download_frame, 
+            text="Search Results", 
+            padding=(15, 10),
+            style="Card.TLabelframe"
+        )
         self.results_scroll_frame = ScrollableFrame(results_frame)
         self.results_container = self.results_scroll_frame.scrollable_frame
         
         # Download progress
-        self.download_progress_frame = ttk.Frame(self.download_frame)
-        self.download_progress = ProgressBar(self.download_progress_frame)
-        self.download_status = ttk.Label(self.download_progress_frame, text="")
+        self.download_progress_frame = ttk.Frame(self.download_frame, padding=(10, 5))
+        self.download_progress_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        # Configure status frame style
+        style = ttk.Style()
+        style.configure("ProgressStatus.TLabel", 
+                       font=("Segoe UI", 10),
+                       foreground="#121C30")
+        
+        # Add status label above progress bar
+        self.download_status = ttk.Label(
+            self.download_progress_frame, 
+            text="Ready for download",
+            style="ProgressStatus.TLabel"
+        )
+        self.download_status.pack(anchor=tk.W, padx=5, pady=(0, 5))
+        
+        # Create progress bar with blue color theme
+        self.download_progress = ProgressBar(
+            self.download_progress_frame,
+            bar_color="#4a86e8",
+            height=16
+        )
+        self.download_progress.pack(fill=tk.X, padx=5, pady=5)
         
         # === Tab 3: Model Training ===
         self.training_frame = ttk.Frame(self.notebook)
         
         # Training options
-        training_options_frame = ttk.LabelFrame(self.training_frame, text="Model Fine-tuning")
+        training_options_frame = ttk.LabelFrame(
+            self.training_frame, 
+            text="Model Fine-tuning",
+            padding=(15, 10),
+            style="Card.TLabelframe"
+        )
+        
+        # Font style for labels
+        label_font = ("Segoe UI", 10)
+        input_font = ("Segoe UI", 10)
         
         # Model selection for training
-        ttk.Label(training_options_frame, text="Select model to fine-tune:").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+        ttk.Label(
+            training_options_frame, 
+            text="Select model to fine-tune:", 
+            font=label_font
+        ).grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
         
         self.training_model_var = tk.StringVar()
-        self.training_model_combo = ttk.Combobox(training_options_frame, textvariable=self.training_model_var, state="readonly", width=40)
+        self.training_model_combo = ttk.Combobox(
+            training_options_frame, 
+            textvariable=self.training_model_var, 
+            state="readonly", 
+            width=40,
+            font=input_font
+        )
         self.training_model_combo.grid(row=0, column=1, sticky=tk.W, padx=10, pady=5)
         
         # Training data options
-        ttk.Label(training_options_frame, text="Training Data Source:").grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
+        ttk.Label(
+            training_options_frame, 
+            text="Training Data Source:", 
+            font=label_font
+        ).grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
         
         self.data_source_var = tk.StringVar(value="local")
-        ttk.Radiobutton(training_options_frame, text="Local Files", variable=self.data_source_var, value="local").grid(row=1, column=1, sticky=tk.W, padx=10)
-        ttk.Radiobutton(training_options_frame, text="Web Resources", variable=self.data_source_var, value="web").grid(row=2, column=1, sticky=tk.W, padx=10)
+        ttk.Radiobutton(
+            training_options_frame, 
+            text="Local Files", 
+            variable=self.data_source_var, 
+            value="local"
+        ).grid(row=1, column=1, sticky=tk.W, padx=10)
+        
+        ttk.Radiobutton(
+            training_options_frame, 
+            text="Web Resources", 
+            variable=self.data_source_var, 
+            value="web"
+        ).grid(row=2, column=1, sticky=tk.W, padx=10)
         
         # Local file selection
         self.file_frame = ttk.Frame(training_options_frame)
-        ttk.Label(self.file_frame, text="Select training files:").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
-        ttk.Button(self.file_frame, text="Browse...", command=self._browse_training_files).grid(row=0, column=1, padx=10, pady=5)
-        self.file_list = tk.Listbox(self.file_frame, width=40, height=5)
+        ttk.Label(
+            self.file_frame, 
+            text="Select training files:", 
+            font=label_font
+        ).grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+        
+        ttk.Button(
+            self.file_frame, 
+            text="Browse...", 
+            command=self._browse_training_files,
+            style="Action.TButton"
+        ).grid(row=0, column=1, padx=10, pady=5)
+        
+        # Style for listbox
+        self.file_list = tk.Listbox(
+            self.file_frame, 
+            width=40, 
+            height=5,
+            font=input_font,
+            background="white",
+            selectbackground="#4a86e8",
+            relief="solid",
+            borderwidth=1
+        )
         self.file_list.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky=tk.W+tk.E)
         self.file_frame.grid(row=3, column=0, columnspan=2, sticky=tk.W+tk.E, padx=10, pady=5)
         
         # Web resource frame
         self.web_frame = ttk.Frame(training_options_frame)
-        ttk.Label(self.web_frame, text="Website URL:").grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
+        ttk.Label(
+            self.web_frame, 
+            text="Website URL:", 
+            font=label_font
+        ).grid(row=0, column=0, sticky=tk.W, padx=10, pady=5)
         
         self.url_var = tk.StringVar()
-        ttk.Entry(self.web_frame, textvariable=self.url_var, width=40).grid(row=0, column=1, padx=10, pady=5, sticky=tk.W+tk.E)
+        ttk.Entry(
+            self.web_frame, 
+            textvariable=self.url_var, 
+            width=40,
+            font=input_font
+        ).grid(row=0, column=1, padx=10, pady=5, sticky=tk.W+tk.E)
         
-        ttk.Button(self.web_frame, text="Fetch Content", command=self._fetch_web_content).grid(row=1, column=0, columnspan=2, padx=10, pady=5)
+        ttk.Button(
+            self.web_frame, 
+            text="Fetch Content", 
+            command=self._fetch_web_content,
+            style="Action.TButton"
+        ).grid(row=1, column=0, columnspan=2, padx=10, pady=5)
+        
         self.web_frame.grid(row=4, column=0, columnspan=2, sticky=tk.W+tk.E, padx=10, pady=5)
         self.web_frame.grid_remove()  # Hide initially
         
         # Training buttons
         button_frame = ttk.Frame(training_options_frame)
-        ttk.Button(button_frame, text="Start Fine-tuning", command=self._start_training).pack(side=tk.LEFT, padx=10, pady=10)
-        ttk.Button(button_frame, text="Cancel", command=self._cancel_training).pack(side=tk.LEFT, padx=10, pady=10)
+        
+        # Define button styles
+        style.configure("Primary.Action.TButton", 
+                       padding=(10, 5), 
+                       font=("Segoe UI", 10, "bold"))
+        style.configure("Secondary.Action.TButton", 
+                       padding=(10, 5), 
+                       font=("Segoe UI", 10))
+        
+        # Training actions
+        start_button = ttk.Button(
+            button_frame, 
+            text="Start Fine-tuning", 
+            command=self._start_training,
+            style="Primary.TButton"
+        )
+        start_button.pack(side=tk.LEFT, padx=10, pady=10)
+        
+        cancel_button = ttk.Button(
+            button_frame, 
+            text="Cancel", 
+            command=self._cancel_training,
+            style="Secondary.TButton"
+        )
+        cancel_button.pack(side=tk.LEFT, padx=10, pady=10)
+        
         button_frame.grid(row=5, column=0, columnspan=2, pady=10)
         
         # Training progress
-        training_progress_frame = ttk.LabelFrame(self.training_frame, text="Training Progress")
+        training_progress_frame = ttk.LabelFrame(
+            self.training_frame, 
+            text="Training Progress",
+            padding=(15, 10),
+            style="Card.TLabelframe"
+        )
         
-        self.training_progress = ProgressBar(training_progress_frame)
+        self.training_status = ttk.Label(
+            training_progress_frame, 
+            text="Ready to start training",
+            font=("Segoe UI", 10),
+            padding=(0, 5)
+        )
+        self.training_status.pack(padx=10, pady=5, anchor=tk.W)
+        
+        self.training_progress = ProgressBar(
+            training_progress_frame,
+            bar_color="#4a86e8",
+            height=16
+        )
         self.training_progress.pack(fill=tk.X, expand=True, padx=10, pady=5)
-        
-        self.training_status = ttk.Label(training_progress_frame, text="Ready to start training")
-        self.training_status.pack(padx=10, pady=5)
         
         # Add tabs to notebook
         self.notebook.add(self.selection_frame, text="Model Selection")
@@ -141,18 +324,18 @@ class ModelManagerPanel(ttk.Frame):
     def _setup_layout(self):
         """Set up the panel layout"""
         # Make the notebook fill the panel
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # === Tab 1: Model Selection ===
         # Models list
         models_frame = self.selection_frame.winfo_children()[0]
-        models_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        models_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(15, 10))
         
         self.models_scroll_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Current model info
         current_model_frame = self.selection_frame.winfo_children()[1]
-        current_model_frame.pack(fill=tk.X, padx=10, pady=10)
+        current_model_frame.pack(fill=tk.X, padx=15, pady=(5, 15))
         
         self.current_model_name.pack(anchor=tk.W, padx=10, pady=2)
         self.current_model_quality.pack(anchor=tk.W, padx=10, pady=2)
@@ -161,18 +344,13 @@ class ModelManagerPanel(ttk.Frame):
         # === Tab 2: Model Download ===
         # Search frame
         search_frame = self.download_frame.winfo_children()[0]
-        search_frame.pack(fill=tk.X, padx=10, pady=10)
+        search_frame.pack(fill=tk.X, padx=15, pady=(15, 10))
         
         # Results frame
         results_frame = self.download_frame.winfo_children()[1]
-        results_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        results_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
         
         self.results_scroll_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # Download progress
-        self.download_progress_frame.pack(fill=tk.X, padx=10, pady=10)
-        self.download_progress.pack(fill=tk.X, padx=5, pady=5)
-        self.download_status.pack(anchor=tk.W, padx=5, pady=5)
         
         # === Tab 3: Model Training ===
         # Training options frame
@@ -215,58 +393,136 @@ class ModelManagerPanel(ttk.Frame):
         downloaded = model.get("downloaded", False)
         current = model.get("name", "") == self.translator.current_model_id
         
-        # Create a frame for the model card
-        card = ttk.Frame(self.models_container)
-        card.pack(fill=tk.X, pady=5, padx=5)
+        # Configure card styles
+        style = ttk.Style()
+        
+        # Define card backgrounds
+        current_bg = "#E3EFFF"
+        normal_bg = "#FFFFFF"
+        bg_color = current_bg if current else normal_bg
+        
+        style.configure("ModelCard.TFrame", 
+                    padding=(15, 10),
+                    relief="solid",
+                    borderwidth=1)
+        
+        style.configure("CurrentModelCard.TFrame", 
+                    padding=(15, 10),
+                    relief="solid",
+                    borderwidth=1)
+                    
+        # Create a frame for the model card with padding and border
+        card = ttk.Frame(
+            self.models_container, 
+            style="CurrentModelCard.TFrame" if current else "ModelCard.TFrame"
+        )
+        card.pack(fill=tk.X, pady=8, padx=10)
         
         # Model name and quality
         info_frame = ttk.Frame(card)
         info_frame.pack(fill=tk.X, side=tk.TOP)
         
-        name_label = ttk.Label(info_frame, text=model_name, font=("Default", 10, "bold"))
-        name_label.pack(anchor=tk.W, padx=5, pady=2)
+        # Configure text styles for light background
+        text_color = "#102040"
+        subtitle_color = "#505A6E"
         
-        # Quality info with progress bar
+        name_label = ttk.Label(
+            info_frame, 
+            text=model_name, 
+            font=("Segoe UI", 11, "bold"),
+            foreground=text_color,
+            background=bg_color
+        )
+        name_label.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Quality info with custom progress bar
         quality_frame = ttk.Frame(info_frame)
-        quality_frame.pack(fill=tk.X, padx=5, pady=2)
+        quality_frame.pack(fill=tk.X, pady=(0, 10))
         
-        quality_bar = ttk.Progressbar(quality_frame, value=quality, maximum=100, length=200)
+        # Custom styling for the progress bar
+        progress_style_name = f"ModelQuality{index}.Horizontal.TProgressbar"
+        style.configure(
+            progress_style_name, 
+            thickness=14,
+            background="#4a86e8" if quality >= 85 else "#63b946" if quality >= 70 else "#e8b84a"
+        )
+        
+        quality_bar = ttk.Progressbar(
+            quality_frame, 
+            value=quality, 
+            maximum=100, 
+            length=220,
+            style=progress_style_name
+        )
         quality_bar.pack(side=tk.LEFT)
         
-        quality_label = ttk.Label(quality_frame, text=f"{quality}% - {quality_desc}")
+        quality_label = ttk.Label(
+            quality_frame,
+            text=f"{quality}% - {quality_desc}",
+            font=("Segoe UI", 9),
+            foreground=subtitle_color,
+            background=bg_color
+        )
         quality_label.pack(side=tk.LEFT, padx=10)
         
         # Action buttons
         button_frame = ttk.Frame(card)
-        button_frame.pack(fill=tk.X, pady=5)
+        button_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        # Style for the buttons
+        style.configure("Model.TButton", padding=6)
+        
+        if current:
+            # Special style for selected button
+            style.configure("ModelSelected.TButton", 
+                        padding=(8, 5),
+                        font=("Segoe UI", 9, "bold"),
+                        background="#4a86e8",
+                        foreground="white")
+            style.map("ModelSelected.TButton",
+                    background=[("active", "#3A76D8"), ("disabled", "#4a86e8")],
+                    foreground=[("disabled", "white")])
+        
+        style.configure("ModelDelete.TButton", padding=6)
         
         if downloaded:
-            select_button = ttk.Button(
-                button_frame, 
-                text="Select" if not current else "Selected", 
-                command=lambda m=model_id: self._select_model(m),
-                state="disabled" if current else "normal"
-            )
-            select_button.pack(side=tk.LEFT, padx=5)
+            if current:
+                select_button = ttk.Button(
+                    button_frame, 
+                    text="✓ Selected",
+                    style="ModelSelected.TButton",
+                    state="disabled"
+                )
+            else:
+                select_button = ttk.Button(
+                    button_frame, 
+                    text="Select", 
+                    command=lambda m=model_id: self._select_model(m),
+                    style="Accent.TButton"
+                )
+            select_button.pack(side=tk.LEFT, padx=(0, 5))
             
             if not model.get("default", False):
                 delete_button = ttk.Button(
                     button_frame, 
                     text="Delete", 
-                    command=lambda m=model_id: self._delete_model(m)
+                    command=lambda m=model_id: self._delete_model(m),
+                    style="Action.TButton"
                 )
-                delete_button.pack(side=tk.LEFT, padx=5)
+                delete_button.pack(side=tk.LEFT)
         else:
             download_button = ttk.Button(
                 button_frame, 
                 text="Download", 
-                command=lambda m=model_id: self._download_model(m)
+                command=lambda m=model_id: self._download_model(m),
+                style="Primary.TButton"
             )
-            download_button.pack(side=tk.LEFT, padx=5)
+            download_button.pack(side=tk.LEFT)
         
         # Add separator after each model except the last one
         if index < len(self.displayed_models) - 1:
-            ttk.Separator(self.models_container, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5, padx=5)
+            separator = ttk.Separator(self.models_container, orient=tk.HORIZONTAL)
+            separator.pack(fill=tk.X, pady=(15, 5), padx=5)
     
     def _update_current_model_info(self):
         """Update the current model information display"""
@@ -277,11 +533,36 @@ class ModelManagerPanel(ttk.Frame):
         quality_desc = model_info.get("quality_description", "")
         model_loaded = model_info.get("model_loaded", False)
         
-        self.current_model_name.config(text=f"Model: {display_name}")
-        self.current_model_quality.config(text=f"Quality: {quality}% - {quality_desc}")
+        # Configure styles for current model
+        style = ttk.Style()
+        # Get the background color
+        bg_color = style.lookup("Current.TLabelframe", "background")
+        text_color = "#102040"
+        
+        # Style the current model display
+        self.current_model_name.config(
+            text=f"Model: {display_name}", 
+            font=("Segoe UI", 11, "bold"),
+            foreground=text_color,
+            background=bg_color
+        )
+        
+        self.current_model_quality.config(
+            text=f"Quality: {quality}% - {quality_desc}", 
+            font=("Segoe UI", 10),
+            foreground=text_color,
+            background=bg_color
+        )
         
         status_text = "Loaded" if model_loaded else "Not loaded"
-        self.current_model_status.config(text=f"Status: {status_text}")
+        status_color = "#43a047" if model_loaded else "#e53935"  # Green if loaded, red if not
+        
+        self.current_model_status.config(
+            text=f"Status: {status_text}",
+            foreground=status_color,
+            font=("Segoe UI", 10, "bold"),
+            background=bg_color
+        )
     
     def _select_model(self, model_id: str):
         """Select a model for translation"""
@@ -401,48 +682,115 @@ class ModelManagerPanel(ttk.Frame):
             self.after(0, lambda: self._update_status(f"Error: {str(e)}", "error"))
     
     def _display_search_results(self, results: List[Dict[str, Any]]):
-        """Display search results"""
+        """Display search results in the UI"""
         # Clear previous results
         for widget in self.results_container.winfo_children():
             widget.destroy()
             
+        if not results:
+            # Show no results message
+            ttk.Label(
+                self.results_container,
+                text="No models found matching your search query.",
+                wraplength=400,
+                font=("Segoe UI", 10),
+                padding=(10, 15)
+            ).pack(padx=10, pady=10)
+            return
+        
+        # Configure style for result cards
+        style = ttk.Style()
+        style.configure("ResultCard.TFrame", 
+                      padding=(15, 10),
+                      relief="solid",
+                      borderwidth=1)
+        
+        # Configure text styles for light background
+        text_color = "#102040"
+        subtitle_color = "#505A6E"
+        bg_color = "#FFFFFF"
+        
+        # Create result cards
         for i, model in enumerate(results):
-            # Create a frame for this result
-            result_frame = ttk.Frame(self.results_container)
-            result_frame.pack(fill=tk.X, padx=5, pady=10)
+            # Create a frame for each result
+            result_frame = ttk.Frame(
+                self.results_container, 
+                style="ResultCard.TFrame"
+            )
+            result_frame.pack(fill=tk.X, pady=8, padx=10)
             
-            # Model name
-            model_id = model.get("name", "")
-            display_name = model.get("display_name", model_id)
-            
-            ttk.Label(result_frame, text=display_name, font=("Default", 10, "bold")).pack(anchor=tk.W, pady=2)
-            
-            # Description (if available)
-            description = model.get("description", "")
-            if description:
-                desc_label = ttk.Label(result_frame, text=description, wraplength=500)
-                desc_label.pack(anchor=tk.W, pady=2)
-            
-            # Stats
-            stats_frame = ttk.Frame(result_frame)
-            stats_frame.pack(anchor=tk.W, pady=2)
-            
+            # Model name and info
+            name = model.get("modelId", "Unknown")
             downloads = model.get("downloads", 0)
             likes = model.get("likes", 0)
             
-            ttk.Label(stats_frame, text=f"Downloads: {downloads}").pack(side=tk.LEFT, padx=5)
-            ttk.Label(stats_frame, text=f"Likes: {likes}").pack(side=tk.LEFT, padx=5)
+            # Format display name
+            org_name = name.split("/")[0] if "/" in name else ""
+            model_name = name.split("/")[1] if "/" in name else name
             
-            # Download button
-            ttk.Button(
-                result_frame, 
-                text="Download", 
-                command=lambda m=model_id: self._download_model(m)
-            ).pack(anchor=tk.W, pady=5)
+            name_frame = ttk.Frame(result_frame)
+            name_frame.pack(fill=tk.X, pady=(0, 5))
             
-            # Add separator
+            if org_name:
+                ttk.Label(
+                    name_frame, 
+                    text=org_name, 
+                    font=("Segoe UI", 9),
+                    foreground=subtitle_color,
+                    background=bg_color
+                ).pack(anchor=tk.W)
+            
+            ttk.Label(
+                name_frame, 
+                text=model_name, 
+                font=("Segoe UI", 11, "bold"),
+                foreground=text_color,
+                background=bg_color
+            ).pack(anchor=tk.W)
+            
+            # Model stats
+            stats_frame = ttk.Frame(result_frame)
+            stats_frame.pack(fill=tk.X, pady=(0, 10))
+            
+            stats_text = f"Downloads: {downloads:,}"
+            if likes > 0:
+                stats_text += f" • Likes: {likes:,}"
+                
+            ttk.Label(
+                stats_frame,
+                text=stats_text,
+                font=("Segoe UI", 9),
+                foreground=subtitle_color,
+                background=bg_color
+            ).pack(anchor=tk.W)
+            
+            # Action buttons
+            button_frame = ttk.Frame(result_frame)
+            button_frame.pack(fill=tk.X)
+            
+            # Check if model is already downloaded
+            is_downloaded = any(m["name"] == name for m in self.displayed_models if m.get("downloaded", False))
+            
+            if is_downloaded:
+                ttk.Button(
+                    button_frame,
+                    text="Already Downloaded",
+                    state="disabled",
+                    style="Secondary.TButton"
+                ).pack(side=tk.LEFT)
+            else:
+                ttk.Button(
+                    button_frame,
+                    text="Download",
+                    command=lambda m=name: self._download_model(m),
+                    style="Primary.TButton"
+                ).pack(side=tk.LEFT)
+            
+            # Add separator except for the last item
             if i < len(results) - 1:
-                ttk.Separator(self.results_container, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+                ttk.Separator(self.results_container, orient=tk.HORIZONTAL).pack(
+                    fill=tk.X, pady=(15, 5), padx=10
+                )
     
     def _update_training_model_list(self):
         """Update the list of models available for training"""

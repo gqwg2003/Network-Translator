@@ -113,7 +113,7 @@ class ThemeManager:
             except tk.TclError:
                 pass
         
-        # Configure widget colors and fonts
+        # Configure common widget colors and fonts
         self.style.configure(
             "TFrame", 
             background=theme["bg"]
@@ -126,25 +126,134 @@ class ThemeManager:
             font=theme["font"]
         )
         
+        # Создаем общие компоненты для кнопок
+        button_border = 1
+        button_relief = "raised"
+        primary_bg = theme["accent"]
+        primary_fg = "#FFFFFF"
+        
+        if self.is_dark_theme():
+            secondary_bg = "#444444"
+            secondary_bg_active = "#555555"
+            secondary_bg_disabled = "#333333"
+        else:
+            secondary_bg = "#E0E0E0"
+            secondary_bg_active = "#D0D0D0"
+            secondary_bg_disabled = "#CCCCCC"
+        
+        # Базовые стили для кнопок (глобальный стиль)
         self.style.configure(
             "TButton", 
-            background=theme["accent"],
+            background=secondary_bg,
             foreground=theme["fg"],
-            font=theme["font"]
+            font=theme["font"],
+            padding=(10, 5),
+            relief=button_relief,
+            borderwidth=button_border,
+            focusthickness=0,  # Уменьшаем толщину фокуса
+            lightcolor=secondary_bg,  # Для 3D-эффекта
+            darkcolor=self._adjust_color(secondary_bg, 0.8)  # Для 3D-эффекта
         )
         
         self.style.map(
             "TButton",
-            background=[('active', theme["accent"])],
-            foreground=[('active', theme["fg"])]
+            background=[('active', secondary_bg_active), ('pressed', self._adjust_color(secondary_bg_active, 0.9)),
+                        ('disabled', secondary_bg_disabled)],
+            foreground=[('active', theme["fg"]), ('disabled', "#A0A0A0")],
+            relief=[('pressed', 'sunken')]
         )
         
+        # Основная кнопка (Primary)
+        self.style.configure(
+            "Primary.TButton",
+            background=primary_bg,
+            foreground=primary_fg,
+            font=(theme["font"][0], theme["font"][1], "bold"),
+            padding=(15, 6),
+            relief=button_relief,
+            borderwidth=button_border,
+            focusthickness=0,
+            lightcolor=self._adjust_color(primary_bg, 1.1),  # Для 3D-эффекта
+            darkcolor=self._adjust_color(primary_bg, 0.9)  # Для 3D-эффекта
+        )
+        
+        self.style.map(
+            "Primary.TButton",
+            background=[('active', self._adjust_color(primary_bg, 1.2)), 
+                        ('pressed', self._adjust_color(primary_bg, 0.9)),
+                        ('disabled', self._adjust_color(primary_bg, 0.7))],
+            foreground=[('active', primary_fg), ('disabled', "#DDDDDD")],
+            relief=[('pressed', 'sunken')]
+        )
+        
+        # Акцентированная кнопка
         self.style.configure(
             "Accent.TButton",
             background=theme["accent"],
-            foreground="#FFFFFF",
+            foreground=primary_fg,
+            padding=(10, 5),
+            relief=button_relief,
+            borderwidth=button_border,
+            focusthickness=0,
+            lightcolor=self._adjust_color(theme["accent"], 1.1),
+            darkcolor=self._adjust_color(theme["accent"], 0.9)
         )
         
+        self.style.map(
+            "Accent.TButton",
+            background=[('active', self._adjust_color(theme["accent"], 1.2)),
+                        ('pressed', self._adjust_color(theme["accent"], 0.9)),
+                        ('disabled', "#888888")],
+            foreground=[('active', primary_fg), ('disabled', "#DDDDDD")],
+            relief=[('pressed', 'sunken')]
+        )
+        
+        # Кнопка действия (Action)
+        self.style.configure(
+            "Action.TButton",
+            background=secondary_bg,
+            foreground=theme["fg"],
+            font=theme["font"],
+            padding=(10, 4),
+            relief=button_relief,
+            borderwidth=button_border,
+            focusthickness=0,
+            lightcolor=self._adjust_color(secondary_bg, 1.1),
+            darkcolor=self._adjust_color(secondary_bg, 0.9)
+        )
+        
+        self.style.map(
+            "Action.TButton",
+            background=[('active', secondary_bg_active),
+                        ('pressed', self._adjust_color(secondary_bg_active, 0.9)),
+                        ('disabled', secondary_bg_disabled)],
+            foreground=[('active', theme["fg"]), ('disabled', "#888888")],
+            relief=[('pressed', 'sunken')]
+        )
+        
+        # Secondary кнопка
+        self.style.configure(
+            "Secondary.TButton",
+            background=secondary_bg,
+            foreground=theme["fg"],
+            padding=(10, 5),
+            relief=button_relief,
+            borderwidth=button_border,
+            focusthickness=0,
+            lightcolor=self._adjust_color(secondary_bg, 1.1),
+            darkcolor=self._adjust_color(secondary_bg, 0.9)
+        )
+        
+        self.style.map(
+            "Secondary.TButton",
+            background=[('active', secondary_bg_active),
+                        ('pressed', self._adjust_color(secondary_bg_active, 0.9)),
+                        ('disabled', secondary_bg_disabled)],
+            foreground=[('active', theme["fg"]), ('disabled', "#888888")],
+            relief=[('pressed', 'sunken')]
+        )
+        
+        # Стиль для вкладок
         self.style.configure(
             "TNotebook", 
             background=theme["bg"],
@@ -169,7 +278,8 @@ class ThemeManager:
         self.style.configure(
             "TEntry",
             fieldbackground=theme["text_bg"],
-            foreground=theme["text_fg"]
+            foreground=theme["text_fg"],
+            borderwidth=1
         )
         
         # Configure root window
@@ -237,4 +347,31 @@ class ThemeManager:
     
     def _is_macos(self) -> bool:
         """Check if running on macOS"""
-        return self.root.tk.call('tk', 'windowingsystem') == 'aqua' 
+        return self.root.tk.call('tk', 'windowingsystem') == 'aqua'
+    
+    def _adjust_color(self, color: str, factor: float) -> str:
+        """
+        Adjust a hex color by a factor (lighten or darken)
+        
+        Args:
+            color: Hex color code
+            factor: Multiply factor (>1 to lighten, <1 to darken)
+            
+        Returns:
+            Adjusted hex color
+        """
+        if not color.startswith('#') or len(color) != 7:
+            return color
+            
+        # Extract RGB components
+        r = int(color[1:3], 16)
+        g = int(color[3:5], 16)
+        b = int(color[5:7], 16)
+        
+        # Adjust
+        r = min(255, max(0, int(r * factor)))
+        g = min(255, max(0, int(g * factor)))
+        b = min(255, max(0, int(b * factor)))
+        
+        # Convert back to hex
+        return f"#{r:02x}{g:02x}{b:02x}" 

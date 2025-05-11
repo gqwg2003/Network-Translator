@@ -40,26 +40,63 @@ class LabeledFrame(ttk.Frame):
         self.collapsible = collapsible
         self._is_collapsed = collapsed
         
-        # Create header frame
-        self.header_frame = ttk.Frame(self)
-        self.header_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=(5, 0))
+        # Determine if we have a theme manager to detect dark mode
+        # Try to get theme manager from parent chain
+        self.theme_manager = None
+        self.use_dark_mode = False
+        
+        parent = self.master
+        while parent:
+            if hasattr(parent, 'theme_manager'):
+                self.theme_manager = parent.theme_manager
+                break
+            if hasattr(parent, 'master'):
+                parent = parent.master
+            else:
+                break
+        
+        # Set dark mode based on theme manager
+        if self.theme_manager:
+            self.use_dark_mode = self.theme_manager.is_dark_theme()
+            # Bind to theme changes
+            self.bind("<<ThemeChanged>>", self._on_theme_changed)
+        
+        # Add a style to make the frame more visible
+        style = ttk.Style()
+        border_color = "#dddddd" if not self.use_dark_mode else "#444444"
+        
+        # Configure styles for different frame states
+        style.configure(
+            "LabeledFrame.TFrame", 
+            relief="solid", 
+            borderwidth=1,
+            bordercolor=border_color
+        )
+        self.configure(style="LabeledFrame.TFrame")
+        
+        # Create header frame with gradient background
+        self.header_frame = ttk.Frame(self, padding=(8, 5))
+        self.header_frame.pack(side=tk.TOP, fill=tk.X)
         
         # Title label
         self.title_var = tk.StringVar(value=title)
         self.title_label = ttk.Label(
             self.header_frame, 
             textvariable=self.title_var, 
-            font=("TkDefaultFont", 10, "bold")
+            font=("Segoe UI", 10, "bold")
         )
         self.title_label.pack(side=tk.LEFT, anchor=tk.W)
         
         # Expand/collapse indicator for collapsible frames
         self.toggle_button = None
         if collapsible:
+            toggle_style = "ToggleDark.TLabel" if self.use_dark_mode else "Toggle.TLabel"
+            style.configure(toggle_style, font=("Segoe UI", 10))
             self.toggle_button = ttk.Label(
                 self.header_frame,
                 text="▼" if not collapsed else "▶",
-                cursor="hand2"
+                cursor="hand2",
+                style=toggle_style
             )
             self.toggle_button.pack(side=tk.LEFT, padx=(5, 0))
             self.toggle_button.bind("<Button-1>", self.toggle_collapsed)
@@ -77,11 +114,26 @@ class LabeledFrame(ttk.Frame):
         # Content frame
         self.content_frame = ttk.Frame(self, padding=padding)
         if not collapsed:
-            self.content_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
+            self.content_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
         
         # Separator
         self.separator = ttk.Separator(self, orient=tk.HORIZONTAL)
-        self.separator.pack(fill=tk.X, padx=5, pady=(0, 5))
+        self.separator.pack(fill=tk.X, padx=0, pady=0)
+    
+    def _on_theme_changed(self, event=None):
+        """Handle theme changes to update frame appearance"""
+        if self.theme_manager:
+            self.use_dark_mode = self.theme_manager.is_dark_theme()
+            
+            # Update toggle button style
+            if self.toggle_button:
+                toggle_style = "ToggleDark.TLabel" if self.use_dark_mode else "Toggle.TLabel"
+                self.toggle_button.configure(style=toggle_style)
+            
+            # Update frame border color
+            style = ttk.Style()
+            border_color = "#dddddd" if not self.use_dark_mode else "#444444"
+            style.configure("LabeledFrame.TFrame", bordercolor=border_color)
     
     def toggle_collapsed(self, event=None):
         """Toggle the collapsed state of the frame"""
@@ -95,7 +147,7 @@ class LabeledFrame(ttk.Frame):
             if self.toggle_button:
                 self.toggle_button.config(text="▶")
         else:
-            self.content_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5, pady=5)
+            self.content_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
             if self.toggle_button:
                 self.toggle_button.config(text="▼")
     
@@ -132,8 +184,19 @@ class LabeledFrame(ttk.Frame):
         if not self.toolbar_frame:
             self.toolbar_frame = ttk.Frame(self.header_frame)
             self.toolbar_frame.pack(side=tk.RIGHT, anchor=tk.E)
-            
-        button = ttk.Button(self.toolbar_frame, text=text, command=command, **kwargs)
+        
+        # Create a style for toolbar buttons
+        style = ttk.Style()
+        button_style = "ToolbarDark.TButton" if self.use_dark_mode else "Toolbar.TButton"
+        style.configure(button_style, padding=3, font=("Segoe UI", 9))
+        
+        button = ttk.Button(
+            self.toolbar_frame, 
+            text=text, 
+            command=command, 
+            style=button_style,
+            **kwargs
+        )
         button.pack(side=tk.LEFT, padx=2)
         return button
         

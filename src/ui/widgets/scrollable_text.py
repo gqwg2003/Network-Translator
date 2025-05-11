@@ -26,6 +26,16 @@ class ScrollableText(scrolledtext.ScrolledText):
             dark_mode: Whether to use dark mode colors
             **kwargs: Additional arguments for ScrolledText
         """
+        # Default font if not specified
+        if 'font' not in kwargs:
+            kwargs['font'] = ('Segoe UI', 10)
+            
+        # Set padding for better appearance
+        if 'padx' not in kwargs:
+            kwargs['padx'] = 8
+        if 'pady' not in kwargs:
+            kwargs['pady'] = 8
+            
         # Set dark mode colors if not specified
         if dark_mode and 'bg' not in kwargs:
             kwargs['bg'] = '#2A2A3A'  # Темно-синий оттенок для фона
@@ -34,7 +44,30 @@ class ScrollableText(scrolledtext.ScrolledText):
         if dark_mode and 'insertbackground' not in kwargs:
             kwargs['insertbackground'] = '#CCCCCC'  # Цвет курсора
             
+        # Create custom scrollbar style
+        style = None
+        try:
+            from tkinter import ttk
+            style = ttk.Style()
+            style.configure("Custom.Vertical.TScrollbar", 
+                           gripcount=0, 
+                           background="#555555" if dark_mode else "#cccccc",
+                           troughcolor="#333333" if dark_mode else "#f0f0f0",
+                           borderwidth=0, 
+                           relief="flat")
+        except Exception:
+            pass
+            
         super().__init__(master, wrap=tk.WORD, **kwargs)
+        
+        # Try to set scrollbar style
+        if style:
+            try:
+                scrollbar = self.vbar  # Access ScrolledText's scrollbar
+                if hasattr(scrollbar, "configure"):
+                    scrollbar.configure(style="Custom.Vertical.TScrollbar")
+            except Exception:
+                pass
         
         self.placeholder = placeholder
         self.placeholder_color = "#888888" if dark_mode else "gray"
