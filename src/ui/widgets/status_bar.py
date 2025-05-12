@@ -56,6 +56,17 @@ class StatusBar(ttk.Frame):
             if fg:
                 label.config(foreground=fg)
     
+    def set_status_color(self, section: str, color: str):
+        """
+        Set the text color for a status section
+        
+        Args:
+            section: Section name
+            color: Text color
+        """
+        if section in self.section_labels:
+            self.section_labels[section].config(foreground=color)
+    
     def clear(self):
         """Clear all status text"""
         for label in self.section_labels.values():

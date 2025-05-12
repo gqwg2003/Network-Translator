@@ -382,21 +382,49 @@ class ApiServer:
                 # Get all headers
                 headers = dict(request.headers)
                 
-                # Create a new request to the regular chat completions endpoint
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"http://{self.host}:{self.port}/v1/chat/completions",
-                        content=body,
-                        headers=headers
+                # Проверяем, запрашивается ли потоковый режим
+                is_stream = False
+                try:
+                    # Пытаемся проверить stream параметр в JSON
+                    request_data = json.loads(body)
+                    is_stream = request_data.get("stream", False)
+                except json.JSONDecodeError:
+                    # Если не можем разобрать JSON, предполагаем обычный запрос
+                    pass
+                
+                # Создаем URL для перенаправления
+                target_url = f"http://{self.host}:{self.port}/v1/chat/completions"
+                
+                # Если запрашивается поток, перенаправляем как поток
+                if is_stream:
+                    # Используем прямое прокси соединение
+                    async def stream_generator():
+                        async with httpx.AsyncClient() as client:
+                            async with client.stream("POST", target_url, content=body, headers=headers) as response:
+                                async for chunk in response.aiter_bytes():
+                                    yield chunk
+                
+                    # Возвращаем потоковый ответ с тем же content-type
+                    return StreamingResponse(
+                        stream_generator(),
+                        media_type="text/event-stream"
                     )
-                    
-                    return JSONResponse(
-                        content=response.json(),
-                        status_code=response.status_code
-                    )
+                else:
+                    # Для обычных запросов используем стандартный подход
+                    async with httpx.AsyncClient() as client:
+                        response = await client.post(
+                            target_url,
+                            content=body,
+                            headers=headers
+                        )
+                        
+                        return JSONResponse(
+                            content=response.json(),
+                            status_code=response.status_code
+                        )
             except Exception as e:
                 logger.error(f"Error forwarding request: {e}")
-                raise HTTPException(status_code=500, detail="Error forwarding request")
+                raise HTTPException(status_code=500, detail=f"Error forwarding request: {str(e)}")
     
     def _stream_response(self, model: str, translated_text: str):
         """
@@ -517,7 +545,9 @@ class ApiServer:
                 headers={"WWW-Authenticate": "Bearer"}
             )
             
-        is_valid = validate_api_key(api_key)
+        # Load API keys before validation
+        api_keys = load_api_keys()
+        is_valid = validate_api_key(api_key, api_keys)
         if not is_valid:
             raise HTTPException(
                 status_code=401,
