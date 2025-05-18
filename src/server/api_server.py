@@ -100,7 +100,7 @@ class FormattingOptionsResponse(BaseModel):
 
 # OpenAI API compatibility models
 class ChatMessage(BaseModel):
-    role: str = Field(..., regex='^(system|user|assistant)$')
+    role: str = Field(..., pattern='^(system|user|assistant)$')
     content: str = Field(..., min_length=1)
 
 class ChatCompletionRequest(BaseModel):

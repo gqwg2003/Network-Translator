@@ -55,7 +55,7 @@ class Translator:
                 self.logger.debug(f"Using model path from model_id: {model_id} -> {model_path}")
             
             # Initialize model
-            self.model = TranslationModel(model_path, model_id)
+            self.model = TranslationModel(model_id or "Helsinki-NLP/opus-mt-en-ru")
             self.current_model_id = model_id or "Helsinki-NLP/opus-mt-en-ru"
             self.logger.info(f"Translator initialized with model: {self.current_model_id}")
             
