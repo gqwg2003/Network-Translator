@@ -348,10 +348,10 @@ class ApiServer:
             logger.info(f"Результат перевода: '{translated_text}'")
             
             # Print debug info to console
-            print(f"\n=== ПЕРЕВОД ===")
-            print(f"Исходный текст: {text_to_translate}")
-            print(f"Переведенный текст: {translated_text}")
-            print(f"===============\n")
+            logger.info(f"\n=== ПЕРЕВОД ===")
+            logger.info(f"Исходный текст: {text_to_translate}")
+            logger.info(f"Переведенный текст: {translated_text}")
+            logger.info(f"===============\n")
             
             # Check if the client requested streaming
             if request.stream:
@@ -567,7 +567,7 @@ class ApiServer:
         self.server_thread.start()
         self.running = True
         
-        print(f"API server started on http://{self.host}:{self.port}")
+        logger.info(f"API server started on http://{self.host}:{self.port}")
     
     def stop(self):
         """Stop the API server"""
@@ -575,4 +575,4 @@ class ApiServer:
             # There's no clean way to stop a uvicorn server from another thread
             # The process will be terminated when the main thread exits
             self.running = False
-            print("API server is shutting down...") 
+            logger.info("API server is shutting down...") 

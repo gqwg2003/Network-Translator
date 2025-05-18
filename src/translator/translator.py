@@ -331,7 +331,7 @@ class Translator:
             try:
                 os.remove(cache_path)
             except Exception as e:
-                print(f"Error removing cache file: {e}")
+                self.logger.warning(f"Error removing cache file: {e}")
     
     def set_cache_enabled(self, enabled: bool):
         """Enable or disable the translation cache"""
@@ -408,7 +408,7 @@ class Translator:
             
             return True
         except Exception as e:
-            print(f"Error changing model: {e}")
+            self.logger.warning(f"Error changing model: {e}")
             return False
     
     def get_available_models(self) -> List[Dict[str, Any]]:
