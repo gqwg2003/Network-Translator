@@ -3,367 +3,129 @@ Text formatting utilities for Neural Network Translator
 """
 import re
 import logging
-from typing import Optional, Dict, List, Callable
+from typing import List, Dict, Any, Optional, Union, Set
 from functools import lru_cache
 
-# Константы
 MIN_TEXT_LENGTH = 1
-MAX_TEXT_LENGTH = 1000000
+MAX_TEXT_LENGTH = 10000
 MAX_PATTERN_LENGTH = 1000
+
 DEFAULT_OPERATIONS = {
-    "smart_quotes": True,
-    "russian_punctuation": True,
-    "normalize_whitespace": True,
-    "fix_common_issues": True
+    "smart_quotes",
+    "punctuation",
+    "whitespace",
+    "common_issues"
 }
 
-# Регулярные выражения
-PUNCTUATION_PATTERNS = {
-    "russian": {
-        "em_dash": r'\s+—\s+',
-        "space_after": r'([,;])(\S)',
-        "space_before": r'\s+([,.!?:;])',
-        "dash": r'\s+-\s+'
-    },
-    "english": {
-        "space_after": r'([,.!?:;])([^\s0-9])',
-        "multiple_spaces": r'\s+'
-    }
-}
+logger = logging.getLogger("nn_translator.text_formatter")
 
 class TextFormatter:
-    """
-    Utility class for text formatting and conversion operations
-    """
-    def __init__(self):
-        """Initialize the text formatter"""
-        self.logger = logging.getLogger("nn_translator.text_formatter")
+    def __init__(self, style: str = "default"):
+        self.style = style
         self._compile_patterns()
-    
-    def _compile_patterns(self) -> None:
-        """Compile regular expressions for better performance"""
-        try:
-            self.compiled_patterns = {}
-            for style, patterns in PUNCTUATION_PATTERNS.items():
-                self.compiled_patterns[style] = {}
-                for name, pattern in patterns.items():
-                    if len(pattern) > MAX_PATTERN_LENGTH:
-                        raise ValueError(f"Pattern {name} is too long (max {MAX_PATTERN_LENGTH} chars)")
-                    try:
-                        self.compiled_patterns[style][name] = re.compile(pattern)
-                    except re.error as e:
-                        self.logger.error(f"Error compiling pattern {name}: {e}")
-                        raise ValueError(f"Invalid pattern {name}: {str(e)}")
-        except Exception as e:
-            self.logger.error(f"Error compiling patterns: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to compile patterns: {str(e)}")
-    
-    def _validate_text(self, text: str) -> None:
-        """
-        Validate input text
         
-        Args:
-            text: Text to validate
-            
-        Raises:
-            ValueError: If text is invalid
-        """
+    def _compile_patterns(self) -> None:
+        self.patterns = {
+            "smart_quotes": re.compile(r'[""](.*?)[""]'),
+            "punctuation": re.compile(r'([.,!?;:])'),
+            "whitespace": re.compile(r'\s+'),
+            "common_issues": re.compile(r'([a-zA-Z])([.,!?;:])')
+        }
+        
+    def _validate_text(self, text: str) -> None:
         if not isinstance(text, str):
             raise ValueError("Text must be a string")
-            
-        if not text.strip():
-            raise ValueError("Text cannot be empty or contain only whitespace")
-            
+        if not text:
+            raise ValueError("Text cannot be empty")
         if len(text) < MIN_TEXT_LENGTH:
-            raise ValueError(f"Text is too short (minimum {MIN_TEXT_LENGTH} characters)")
-            
+            raise ValueError(f"Text length must be at least {MIN_TEXT_LENGTH} character")
         if len(text) > MAX_TEXT_LENGTH:
-            raise ValueError(f"Text is too long (maximum {MAX_TEXT_LENGTH} characters)")
-    
-    def _validate_operations(self, operations: Dict[str, bool]) -> None:
-        """
-        Validate formatting operations
-        
-        Args:
-            operations: Dictionary of operations to validate
+            raise ValueError(f"Text length must not exceed {MAX_TEXT_LENGTH} characters")
             
-        Raises:
-            ValueError: If operations are invalid
-        """
-        if not isinstance(operations, dict):
-            raise ValueError("Operations must be a dictionary")
+    def _validate_operations(self, operations: List[str]) -> None:
+        if not operations:
+            raise ValueError("Operations list cannot be empty")
+        if not all(op in DEFAULT_OPERATIONS for op in operations):
+            raise ValueError(f"Invalid operation. Must be one of: {', '.join(DEFAULT_OPERATIONS)}")
             
-        for key, value in operations.items():
-            if key not in DEFAULT_OPERATIONS:
-                raise ValueError(f"Unknown operation: {key}")
-            if not isinstance(value, bool):
-                raise ValueError(f"Operation value must be boolean: {key}")
-    
     def _validate_style(self, style: str) -> None:
-        """
-        Validate style parameter
-        
-        Args:
-            style: Style to validate
-            
-        Raises:
-            ValueError: If style is invalid
-        """
         if not isinstance(style, str):
             raise ValueError("Style must be a string")
+        if not style:
+            raise ValueError("Style cannot be empty")
             
-        if style.lower() not in PUNCTUATION_PATTERNS:
-            raise ValueError(f"Style must be one of: {', '.join(PUNCTUATION_PATTERNS.keys())}")
-    
-    def _validate_result(self, result: str) -> str:
-        """
-        Validate formatting result
-        
-        Args:
-            result: Result to validate
+    def _validate_result(self, result: str) -> None:
+        if not result:
+            raise ValueError("Formatting result cannot be empty")
+        if len(result) > MAX_TEXT_LENGTH:
+            raise ValueError(f"Formatted text exceeds maximum length of {MAX_TEXT_LENGTH} characters")
             
-        Returns:
-            Validated result
-            
-        Raises:
-            ValueError: If result is invalid
-        """
-        if not isinstance(result, str):
-            raise ValueError("Result must be a string")
-            
-        if not result.strip():
-            raise ValueError("Result cannot be empty or contain only whitespace")
-            
-        return result
-    
     @lru_cache(maxsize=1000)
-    def convert_smart_quotes(self, text: str, to_smart: bool = True) -> str:
-        """
-        Convert between straight and smart quotes (curly)
-        
-        Args:
-            text: The text to process
-            to_smart: If True, convert straight quotes to smart quotes. 
-                     If False, convert smart quotes to straight quotes.
-        
-        Returns:
-            Processed text
-            
-        Raises:
-            ValueError: If text is invalid
-            RuntimeError: If conversion fails
-        """
+    def convert_smart_quotes(self, text: str) -> str:
         try:
             self._validate_text(text)
-            
-            if to_smart:
-                # Простой метод - заменяем все двойные кавычки на «»
-                # Сначала заменяем пары кавычек
-                result = ""
-                in_quote = False
-                for char in text:
-                    if char == '"':
-                        if in_quote:
-                            result += '»'
-                            in_quote = False
-                        else:
-                            result += '«'
-                            in_quote = True
-                    else:
-                        result += char
-                
-                # Обработка одиночных кавычек (апострофов)
-                text = result
-                result = ""
-                in_quote = False
-                for char in text:
-                    if char == "'":
-                        if in_quote:
-                            result += '''
-                            in_quote = False
-                        else:
-                            result += '''
-                            in_quote = True
-                    else:
-                        result += char
-                
-                return self._validate_result(result)
-            else:
-                # Convert smart quotes to straight quotes
-                result = text.replace('«', '"').replace('»', '"')
-                result = result.replace('"', '"').replace('"', '"')
-                result = result.replace(''', "'").replace(''', "'")
-                return self._validate_result(result)
-                
-        except ValueError as e:
-            self.logger.error(f"Validation error in convert_smart_quotes: {e}")
-            raise
+            result = self.patterns["smart_quotes"].sub(r'"\1"', text)
+            self._validate_result(result)
+            return result
         except Exception as e:
-            self.logger.error(f"Error in convert_smart_quotes: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to convert quotes: {str(e)}")
-    
-    @lru_cache(maxsize=1000)
-    def convert_punctuation(self, text: str, style: str = "russian") -> str:
-        """
-        Convert punctuation according to the specified style
-        
-        Args:
-            text: The text to process
-            style: The style to convert to ("russian" or "english")
-        
-        Returns:
-            Processed text
+            logger.error(f"Error converting smart quotes: {e}")
+            return text
             
-        Raises:
-            ValueError: If text or style is invalid
-            RuntimeError: If conversion fails
-        """
+    @lru_cache(maxsize=1000)
+    def convert_punctuation(self, text: str) -> str:
         try:
             self._validate_text(text)
-            self._validate_style(style)
-            
-            # Get patterns for the specified style
-            patterns = self.compiled_patterns.get(style.lower(), {})
-            
-            # Apply each pattern
-            result = text
-            for pattern_name, pattern in patterns.items():
-                try:
-                    if pattern_name == "space_after":
-                        result = pattern.sub(r'\1 \2', result)
-                    elif pattern_name == "space_before":
-                        result = pattern.sub(r' \1', result)
-                    else:
-                        result = pattern.sub(' ', result)
-                except re.error as e:
-                    self.logger.error(f"Regex error in pattern {pattern_name}: {e}")
-                    continue
-                    
-            return self._validate_result(result)
-        except ValueError as e:
-            self.logger.error(f"Validation error in convert_punctuation: {e}")
-            raise
+            result = self.patterns["punctuation"].sub(r'\1 ', text)
+            self._validate_result(result)
+            return result
         except Exception as e:
-            self.logger.error(f"Error in convert_punctuation: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to convert punctuation: {str(e)}")
-    
+            logger.error(f"Error converting punctuation: {e}")
+            return text
+            
     @lru_cache(maxsize=1000)
     def normalize_whitespace(self, text: str) -> str:
-        """
-        Normalize whitespace in text
-        
-        Args:
-            text: The text to process
-        
-        Returns:
-            Processed text
-            
-        Raises:
-            ValueError: If text is invalid
-            RuntimeError: If normalization fails
-        """
         try:
             self._validate_text(text)
-            
-            # Replace multiple spaces with a single space
-            result = re.sub(r'\s+', ' ', text)
-            
-            # Remove leading/trailing whitespace
-            result = result.strip()
-            
-            return self._validate_result(result)
-        except ValueError as e:
-            self.logger.error(f"Validation error in normalize_whitespace: {e}")
-            raise
+            result = self.patterns["whitespace"].sub(' ', text).strip()
+            self._validate_result(result)
+            return result
         except Exception as e:
-            self.logger.error(f"Error in normalize_whitespace: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to normalize whitespace: {str(e)}")
-    
+            logger.error(f"Error normalizing whitespace: {e}")
+            return text
+            
     @lru_cache(maxsize=1000)
     def fix_common_issues(self, text: str) -> str:
-        """
-        Fix common text issues
-        
-        Args:
-            text: The text to process
-        
-        Returns:
-            Processed text
-            
-        Raises:
-            ValueError: If text is invalid
-            RuntimeError: If fixing fails
-        """
         try:
             self._validate_text(text)
-            
-            # Fix common issues
-            result = text
-            
-            # Fix multiple punctuation
-            result = re.sub(r'([.,!?])\1+', r'\1', result)
-            
-            # Fix spaces around punctuation
-            result = re.sub(r'\s+([.,!?])', r'\1', result)
-            
-            # Fix multiple spaces
-            result = re.sub(r'\s+', ' ', result)
-            
-            # Fix leading/trailing whitespace
-            result = result.strip()
-            
-            return self._validate_result(result)
-        except ValueError as e:
-            self.logger.error(f"Validation error in fix_common_issues: {e}")
-            raise
+            result = self.patterns["common_issues"].sub(r'\1 \2', text)
+            self._validate_result(result)
+            return result
         except Exception as e:
-            self.logger.error(f"Error in fix_common_issues: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to fix common issues: {str(e)}")
-    
-    @lru_cache(maxsize=1000)
-    def process_text(self, text: str, operations: Dict[str, bool] = None) -> str:
-        """
-        Process text with specified operations
-        
-        Args:
-            text: The text to process
-            operations: Dictionary of operations to apply
+            logger.error(f"Error fixing common issues: {e}")
+            return text
             
-        Returns:
-            Processed text
-            
-        Raises:
-            ValueError: If text or operations are invalid
-            RuntimeError: If processing fails
-        """
+    def format_text(self, text: str, operations: Optional[List[str]] = None) -> str:
         try:
             self._validate_text(text)
             
-            # Use default operations if none provided
             if operations is None:
-                operations = DEFAULT_OPERATIONS
+                operations = list(DEFAULT_OPERATIONS)
             else:
                 self._validate_operations(operations)
-            
-            # Apply each operation
+                
             result = text
-            
-            if operations.get("smart_quotes", False):
-                result = self.convert_smart_quotes(result)
-                
-            if operations.get("russian_punctuation", False):
-                result = self.convert_punctuation(result, "russian")
-                
-            if operations.get("normalize_whitespace", False):
-                result = self.normalize_whitespace(result)
-                
-            if operations.get("fix_common_issues", False):
-                result = self.fix_common_issues(result)
-                
-            return self._validate_result(result)
-        except ValueError as e:
-            self.logger.error(f"Validation error in process_text: {e}")
-            raise
+            for operation in operations:
+                if operation == "smart_quotes":
+                    result = self.convert_smart_quotes(result)
+                elif operation == "punctuation":
+                    result = self.convert_punctuation(result)
+                elif operation == "whitespace":
+                    result = self.normalize_whitespace(result)
+                elif operation == "common_issues":
+                    result = self.fix_common_issues(result)
+                    
+            self._validate_result(result)
+            return result
         except Exception as e:
-            self.logger.error(f"Error in process_text: {e}", exc_info=True)
-            raise RuntimeError(f"Failed to process text: {str(e)}") 
+            logger.error(f"Error formatting text: {e}")
+            return text 
