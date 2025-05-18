@@ -196,36 +196,15 @@ class ApiServer:
         async def root():
             return {"message": "Neural Network Translator API"}
         
-        @self.app.get("/api/status", response_model=ServerStatusResponse)
+        @self.app.get("/status")
         @limiter.limit("60/minute")
-        async def server_status():
-            try:
-                self.requests_handled += 1
-                
-                uptime = int(time.time() - self.start_time)
-                model_info = self.translator.get_model_info()
-                
-                # Get system stats
-                cpu_usage = psutil.cpu_percent()
-                memory_usage = psutil.virtual_memory().percent
-                
-                return ServerStatusResponse(
-                    uptime=uptime,
-                    translator_ready=model_info.get("model_loaded", False),
-                    cache_enabled=model_info.get("cache_enabled", False),
-                    cache_entries=model_info.get("cache_entries", 0),
-                    cpu_usage=cpu_usage,
-                    memory_usage=memory_usage,
-                    requests_handled=self.requests_handled,
-                    formatting_enabled=any(self.translator.formatting_options.values()),
-                    formatting_options=self.translator.formatting_options
-                )
-            except Exception as e:
-                logger.error(f"Error in server_status: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=500,
-                    detail="Failed to get server status"
-                )
+        async def server_status(request: Request):
+            """Get server status"""
+            return {
+                "status": "running",
+                "version": VERSION,
+                "uptime": str(datetime.now() - self.start_time)
+            }
         
         @self.app.post("/api/translate", response_model=TranslationResponse)
         @limiter.limit("30/minute")
@@ -330,6 +309,7 @@ class ApiServer:
         @self.app.get("/api/formatting/options", response_model=FormattingOptionsResponse)
         @limiter.limit("60/minute")
         async def get_formatting_options(
+            request: Request,
             api_key: Optional[str] = Header(None),
             authorization: Optional[str] = Header(None)
         ):
@@ -417,6 +397,7 @@ class ApiServer:
         @self.app.post("/api/cache/clear", response_model=CacheStatusResponse)
         @limiter.limit("30/minute")
         async def clear_cache(
+            request: Request,
             api_key: Optional[str] = Header(None),
             authorization: Optional[str] = Header(None)
         ):
@@ -446,6 +427,7 @@ class ApiServer:
         @self.app.get("/api/cache/status", response_model=CacheStatusResponse)
         @limiter.limit("60/minute")
         async def cache_status(
+            request: Request,
             api_key: Optional[str] = Header(None),
             authorization: Optional[str] = Header(None)
         ):
@@ -472,7 +454,7 @@ class ApiServer:
         
         @self.app.post("/api/generate_key", response_model=ApiKeyResponse)
         @limiter.limit("10/minute")
-        async def generate_key():
+        async def generate_key(request: Request):
             try:
                 api_key = generate_api_key()
                 if not save_api_key(api_key, {"created_at": str(datetime.now())}):
@@ -497,6 +479,7 @@ class ApiServer:
         @self.app.delete("/api/revoke_key")
         @limiter.limit("10/minute")
         async def revoke_key(
+            request: Request,
             api_key: Optional[str] = Header(None),
             authorization: Optional[str] = Header(None)
         ):
@@ -526,21 +509,30 @@ class ApiServer:
         @self.app.post("/v1/chat/completions")
         @limiter.limit("30/minute")
         async def chat_completions(
-            request: ChatCompletionRequest,
-            api_key: Optional[str] = Header(None),
+            request: Request,
+            chat_request: ChatCompletionRequest,
+            api_key: Optional[str] = Header(None, alias="Authorization"),
             authorization: Optional[str] = Header(None)
         ):
             try:
                 # Логируем входящий запрос
-                logger.info(f"Получен запрос к OpenAI API: {request}")
+                logger.info(f"Получен запрос к OpenAI API: {chat_request}")
                 
                 # Получаем API-ключ из любого доступного заголовка
                 key = self._extract_api_key(api_key, authorization)
+                if not key:
+                    # Если ключ не найден в заголовках, пробуем получить из тела запроса
+                    try:
+                        body = await request.json()
+                        key = body.get("api_key")
+                    except:
+                        pass
+                
                 self._validate_api_key_or_raise(key)
                 
                 # Extract text to translate from the last user message
                 text_to_translate = ""
-                for message in reversed(request.messages):
+                for message in reversed(chat_request.messages):
                     if message.role == "user":
                         text_to_translate = message.content
                         break
@@ -584,13 +576,13 @@ class ApiServer:
                 logger.info(f"===============\n")
                 
                 # Check if the client requested streaming
-                if request.stream:
+                if chat_request.stream:
                     logger.info("Клиент запросил потоковый ответ, отправляем SSE")
-                    return self._stream_response(request.model, translated_text)
+                    return self._stream_response(chat_request.model, translated_text)
                 
                 # Create response in OpenAI format (non-streaming)
                 response = ChatCompletionResponse(
-                    model=request.model,
+                    model=chat_request.model,
                     choices=[
                         ChatCompletionChoice(
                             message=ChatCompletionChoiceMessage(
@@ -864,12 +856,19 @@ class ApiServer:
             api_keys = load_api_keys()
             
             # Проверяем формат ключа
-            if not (api_key.startswith("nn_tr_") or api_key.startswith("sk-") or api_key.startswith("nn_translator_")):
+            if not (api_key.startswith("nn_tr_") or 
+                   api_key.startswith("sk-") or 
+                   api_key.startswith("nn_translator_") or
+                   api_key.startswith("Bearer ")):
                 raise HTTPException(
                     status_code=401,
                     detail="Invalid API key format",
                     headers={"WWW-Authenticate": "Bearer"}
                 )
+            
+            # Удаляем префикс Bearer если есть
+            if api_key.startswith("Bearer "):
+                api_key = api_key[7:].strip()
             
             # Проверяем длину ключа
             if len(api_key) < 10:
@@ -879,7 +878,12 @@ class ApiServer:
                     headers={"WWW-Authenticate": "Bearer"}
                 )
             
-            is_valid = validate_api_key(api_key, api_keys)
+            # Для OpenAI-стиля ключей пропускаем проверку в базе
+            if api_key.startswith("sk-"):
+                return True
+                
+            # Проверяем наличие ключа в списке
+            is_valid = api_key in api_keys
             if not is_valid:
                 raise HTTPException(
                     status_code=401,

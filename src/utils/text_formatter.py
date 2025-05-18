@@ -128,4 +128,23 @@ class TextFormatter:
             return result
         except Exception as e:
             logger.error(f"Error formatting text: {e}")
+            return text
+
+    def process_text(self, text: str, options: dict = None) -> str:
+        """Process text with formatting options"""
+        if not options:
+            return text
+            
+        try:
+            # Apply formatting options
+            if options.get("preserve_case", False):
+                text = self._preserve_case(text)
+            if options.get("preserve_punctuation", False):
+                text = self._preserve_punctuation(text)
+            if options.get("preserve_numbers", False):
+                text = self._preserve_numbers(text)
+                
+            return text
+        except Exception as e:
+            logger.error(f"Error formatting text: {str(e)}")
             return text 

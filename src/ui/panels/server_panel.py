@@ -4,6 +4,7 @@ import threading
 import json
 import requests
 from typing import Optional, Callable
+import logging
 
 from src.server.api_server import ApiServer
 from src.utils.api_utils import generate_api_key, save_api_key
@@ -32,6 +33,7 @@ class ServerPanel(ttk.Frame):
         
         self.api_server = None
         self.on_status_change = on_status_change
+        self.logger = logging.getLogger("nn_translator.ui.server_panel")
         
         self._create_widgets()
         self._setup_layout()
@@ -680,24 +682,16 @@ else:
     
     def _generate_api_key(self):
         """Generate a new API key"""
-        # Generate new universal key
-        api_key = generate_api_key()
-        
-        # Save the API key
-        save_api_key(api_key, {"created_at": "Generated from UI"})
-        
-        # Update UI
-        self.api_key_text.config(state=tk.NORMAL)
-        self.api_key_text.delete("1.0", tk.END)
-        self.api_key_text.insert("1.0", api_key)
-        self.api_key_text.config(state=tk.DISABLED)
-        
-        # Сохраняем API-ключ в настройках
-        set_setting("api.last_key", api_key)
-        
-        # Update status bar
-        if self.on_status_change:
-            self.on_status_change("New API key generated", "success")
+        try:
+            api_key = generate_api_key(name="default")  # Adding default name
+            self.api_key_text.config(state=tk.NORMAL)
+            self.api_key_text.delete("1.0", tk.END)
+            self.api_key_text.insert("1.0", api_key)
+            self.api_key_text.config(state=tk.DISABLED)
+            self.logger.info("Generated new API key")
+        except Exception as e:
+            self.logger.error(f"Error generating API key: {str(e)}")
+            messagebox.showerror("Error", f"Failed to generate API key: {str(e)}")
     
     def _copy_api_key(self):
         """Copy API key to clipboard"""
