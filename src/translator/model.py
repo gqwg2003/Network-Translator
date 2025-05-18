@@ -42,6 +42,7 @@ class TranslationModel:
             raise ValueError("Model ID cannot be empty")
             
         self.model_id = model_id
+        self.model_path = model_id  # Для совместимости с get_model_info
         self.model = None
         self.tokenizer = None
         
