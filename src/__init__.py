@@ -1,3 +1,0 @@
-"""
-Neural Network Translator Application
-""" 
