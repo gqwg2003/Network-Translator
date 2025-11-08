@@ -1,3 +1,3 @@
-Находится в разработке.
+через 200 лет завершу
 
-It is under development.
+In 200 years I‘ll finish
